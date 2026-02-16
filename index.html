@@ -37,9 +37,7 @@
     align-items:start;
   }
   @media (max-width:520px){
-    .layout{
-      grid-template-columns: 300px 1fr;
-    }
+    .layout{ grid-template-columns: 300px 1fr; }
   }
 
   .card{
@@ -130,12 +128,13 @@
 
   /* RIGHT: STAGE */
   .right{ padding:14px; }
+
   .stage{
     position:relative;
     width:100%;
   }
 
-  /* We use a sizer image to reserve height (aula_normal) */
+  /* Reserve height: NOW DYNAMIC (we swap src in JS) */
   #imgSizer{
     width:100%;
     height:auto;
@@ -146,11 +145,14 @@
     border:1px solid rgba(255,255,255,.10);
   }
 
+  /* Scene images: FORCE SAME FIT for all ratios */
   .sceneImg{
     position:absolute;
     inset:0;
     width:100%;
-    height:auto;
+    height:100%;
+    object-fit: contain;
+    object-position: center;
     display:block;
     border-radius:14px;
     border:1px solid rgba(255,255,255,.10);
@@ -158,7 +160,6 @@
     pointer-events:none;
     transition: opacity 900ms ease;
   }
-
   .sceneImg.show{
     opacity:1;
     pointer-events:auto;
@@ -186,27 +187,28 @@
     box-shadow: 0 0 0 6px rgba(34,197,94,.25);
     animation: pulse 1.1s infinite;
   }
-
   @keyframes pulse{
     0%{ transform: scale(1); }
     50%{ transform: scale(1.01); }
     100%{ transform: scale(1); }
   }
 
-  /* BARRIO: instituto SIEMPRE visible con CONTORNO ROJO (SIN RELLENO) */
+  /* BARRIO: overlays ONLY visible in barrio */
+  .barrioOnly{ display:none; }
+  .stage.showBarrio .barrioOnly{ display:block; }
+
+  /* BARRIO: instituto referencia SIEMPRE visible (contorno rojo, sin relleno) */
   #bInstitutoRef{
     border: 3px solid rgba(239,68,68,.95);
     box-shadow: 0 0 0 6px rgba(239,68,68,.14);
-    background: transparent; /* clave: sin relleno */
-    pointer-events:none; /* solo clicable en paso que toca */
+    background: transparent;
+    pointer-events:none;
   }
-
   #bInstitutoRef.activeRef{
     pointer-events:auto;
     cursor:pointer;
     animation: pulseRef 1.1s infinite;
   }
-
   @keyframes pulseRef{
     0%{ transform: scale(1); }
     50%{ transform: scale(1.03); }
@@ -237,7 +239,7 @@
     <!-- RIGHT PANEL -->
     <section class="card right" aria-label="Mapa">
       <div class="stage" id="stage">
-        <!-- Reserve height -->
+        <!-- Reserve height (src will be updated per scene) -->
         <img id="imgSizer" src="aula_normal.jpg" alt="" />
 
         <!-- Images (fade) -->
@@ -256,7 +258,6 @@
 
         <!-- ======================
              HOTSPOTS: INSTITUTO (sobre mapa.jpg)
-             (Mantenemos las coords que ya te funcionaban)
              ====================== -->
         <div class="zona" id="iPistas" data-target="i_pistas" style="left:6%;top:18%;width:42%;height:32%"></div>
         <div class="zona" id="iEntrada" data-target="i_entrada" style="left:45%;top:66%;width:10%;height:22%"></div>
@@ -264,16 +265,15 @@
 
         <!-- ======================
              HOTSPOTS: BARRIO (sobre barrio.jpg)
-             Instituto: referencia SIEMPRE visible (contorno rojo)
-             Mar y Oficinas: invisibles cuando toca
+             (ONLY visible when barrio is active)
              ====================== -->
-        <div class="zona" id="bInstitutoRef" data-target="b_instituto"
+        <div class="zona barrioOnly" id="bInstitutoRef" data-target="b_instituto"
              style="left:37.1%;top:1.8%;width:6.2%;height:16.7%"></div>
 
-        <div class="zona" id="bOficinas" data-target="b_oficinas"
+        <div class="zona barrioOnly" id="bOficinas" data-target="b_oficinas"
              style="left:37.4%;top:74.4%;width:18.8%;height:21.8%"></div>
 
-        <div class="zona" id="bMar" data-target="b_mar"
+        <div class="zona barrioOnly" id="bMar" data-target="b_mar"
              style="left:78.9%;top:42.0%;width:21.1%;height:48.0%"></div>
       </div>
     </section>
@@ -307,18 +307,20 @@
   const btnYes = document.getElementById("btnYes");
   const btnContinue = document.getElementById("btnContinue");
 
+  const stage = document.getElementById("stage");
+  const imgSizer = document.getElementById("imgSizer");
+
   const imgAulaNormal = document.getElementById("imgAulaNormal");
   const imgAulaMapa   = document.getElementById("imgAulaMapa");
   const imgInstituto  = document.getElementById("imgInstituto");
   const imgBarrio     = document.getElementById("imgBarrio");
 
   // AULA zones
-  const aZones = [
-    document.getElementById("aZ1"),
-    document.getElementById("aZ2"),
-    document.getElementById("aZ3"),
-    document.getElementById("aZ4"),
-  ];
+  const aZ1 = document.getElementById("aZ1");
+  const aZ2 = document.getElementById("aZ2");
+  const aZ3 = document.getElementById("aZ3");
+  const aZ4 = document.getElementById("aZ4");
+  const aZones = [aZ1,aZ2,aZ3,aZ4];
 
   // INSTITUTO zones
   const iPistas  = document.getElementById("iPistas");
@@ -340,7 +342,7 @@
   btnPlay.addEventListener("click", () => speak(currentText));
 
   // -----------------------
-  // IMAGE VISIBILITY (fade)
+  // IMAGE VISIBILITY (fade) + FIX ASPECT RATIO
   // -----------------------
   function hideAllImages(){
     [imgAulaNormal, imgAulaMapa, imgInstituto, imgBarrio].forEach(img => {
@@ -350,9 +352,16 @@
   }
 
   function showImage(which){
+    // ✅ Fix ratio for EVERY scene
+    imgSizer.src = which.getAttribute("src");
+
     hideAllImages();
     which.classList.add("show");
     which.style.pointerEvents = "auto";
+
+    // ✅ Barrio overlays only when barrio is shown
+    if(which === imgBarrio) stage.classList.add("showBarrio");
+    else stage.classList.remove("showBarrio");
   }
 
   // -----------------------
@@ -361,8 +370,10 @@
   function disableAllHotspots(){
     // AULA
     aZones.forEach(z => { z.style.pointerEvents = "none"; z.classList.remove("flashOk"); });
+
     // INSTITUTO
     [iPistas, iEntrada, iClase].forEach(z => { z.style.pointerEvents = "none"; z.classList.remove("markClase"); });
+
     // BARRIO
     bInstitutoRef.style.pointerEvents = "none";
     bInstitutoRef.classList.remove("activeRef");
@@ -378,38 +389,29 @@
   function enableInstitutoTarget(target){
     disableAllHotspots();
     if(target === "clase"){
-      // marcada
       iClase.style.pointerEvents = "auto";
       iClase.classList.add("markClase");
     } else if(target === "entrada"){
-      // invisible
-      iEntrada.style.pointerEvents = "auto";
+      iEntrada.style.pointerEvents = "auto"; // invisible
     } else if(target === "pistas"){
-      // invisible
-      iPistas.style.pointerEvents = "auto";
+      iPistas.style.pointerEvents = "auto";  // invisible
     }
   }
 
   function enableBarrioTarget(target){
     disableAllHotspots();
-    // Instituto referencia SIEMPRE visible (contorno rojo). Aquí solo activamos click si toca.
-    // (El div se ve siempre porque tiene borde; no lo ocultamos nunca.)
     if(target === "instituto"){
       bInstitutoRef.style.pointerEvents = "auto";
       bInstitutoRef.classList.add("activeRef");
     } else if(target === "mar"){
-      bMar.style.pointerEvents = "auto"; // invisible, clicable
+      bMar.style.pointerEvents = "auto";
     } else if(target === "oficinas"){
-      bOficinas.style.pointerEvents = "auto"; // invisible, clicable
+      bOficinas.style.pointerEvents = "auto";
     }
   }
 
   // -----------------------
-  // SCENES (action/praise/transition)
-  // Rules:
-  // - action: requires correct click, no Continue
-  // - praise: has Continue, no “transition narrative” inside
-  // - transition: has Continue, creative bridge text to next module
+  // SCENES
   // -----------------------
   const scenes = [
     // ===== AULA =====
@@ -664,7 +666,7 @@ AHORA SABES USAR UN MAPA.`
       noteEl.textContent = "PULSA ▶ PLAY PARA ESCUCHAR. LUEGO PULSA CONTINUAR.";
     }
 
-    // Image (fade)
+    // Image (fade) + ratio fix
     if(s.image === "aula_normal") showImage(imgAulaNormal);
     else if(s.image === "aula_mapa") showImage(imgAulaMapa);
     else if(s.image === "instituto") showImage(imgInstituto);
@@ -690,16 +692,10 @@ AHORA SABES USAR UN MAPA.`
         disableAllHotspots();
       }
     } else {
-      // praise/transition: no clicks
       disableAllHotspots();
-      // BUT barrio institute reference must remain visible always:
-      // it is always visible by CSS border; we just keep pointer-events off here.
     }
   }
 
-  // -----------------------
-  // Scene navigation
-  // -----------------------
   function next(){
     idx = Math.min(idx + 1, scenes.length - 1);
     render();
@@ -710,14 +706,8 @@ AHORA SABES USAR UN MAPA.`
     render();
   }
 
-  // YES button (only from intro)
-  btnYes.addEventListener("click", () => {
-    // Move to aula map action
-    // Ensure we go to the next scene (a_action_seat)
-    next();
-  });
+  btnYes.addEventListener("click", () => next());
 
-  // CONTINUE button
   btnContinue.addEventListener("click", () => {
     const s = scenes[idx];
     if(s.kind === "praise_end"){
@@ -727,9 +717,6 @@ AHORA SABES USAR UN MAPA.`
     next();
   });
 
-  // -----------------------
-  // Click handling
-  // -----------------------
   function onCorrectTarget(target){
     const s = scenes[idx];
     if(s.kind !== "action") return;
@@ -737,9 +724,8 @@ AHORA SABES USAR UN MAPA.`
     // AULA: correct is a3
     if(s.target === "a3"){
       if(target === "a3"){
-        // tiny confirm
-        document.getElementById("aZ3").classList.add("flashOk");
-        next(); // praise
+        aZ3.classList.add("flashOk");
+        next();
       } else {
         noteEl.textContent = "NO. PRUEBA OTRA VEZ.";
         speak("NO. PRUEBA OTRA VEZ.");
@@ -758,26 +744,21 @@ AHORA SABES USAR UN MAPA.`
     if(s.target === "b_oficinas" && target === "b_oficinas") { next(); return; }
   }
 
-  // AULA zones
-  document.getElementById("aZ1").addEventListener("click", () => onCorrectTarget("a1"));
-  document.getElementById("aZ2").addEventListener("click", () => onCorrectTarget("a2"));
-  document.getElementById("aZ3").addEventListener("click", () => onCorrectTarget("a3"));
-  document.getElementById("aZ4").addEventListener("click", () => onCorrectTarget("a4"));
+  // Click wiring
+  aZ1.addEventListener("click", () => onCorrectTarget("a1"));
+  aZ2.addEventListener("click", () => onCorrectTarget("a2"));
+  aZ3.addEventListener("click", () => onCorrectTarget("a3"));
+  aZ4.addEventListener("click", () => onCorrectTarget("a4"));
 
-  // INSTITUTO zones
   iClase.addEventListener("click", () => onCorrectTarget("i_clase"));
   iEntrada.addEventListener("click", () => onCorrectTarget("i_entrada"));
   iPistas.addEventListener("click", () => onCorrectTarget("i_pistas"));
 
-  // BARRIO zones
   bInstitutoRef.addEventListener("click", () => onCorrectTarget("b_instituto"));
   bMar.addEventListener("click", () => onCorrectTarget("b_mar"));
   bOficinas.addEventListener("click", () => onCorrectTarget("b_oficinas"));
 
-  // -----------------------
-  // Start state
-  // -----------------------
-  // Start with Aula normal visible; reference border for barrio institute is always visible by CSS
+  // Start
   showImage(imgAulaNormal);
   render();
 })();
