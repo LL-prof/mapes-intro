@@ -1,0 +1,786 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>MAPAS · AULA → INSTITUTO → BARRIO</title>
+
+<style>
+  :root{
+    --bg:#0f172a;
+    --ink:#ffffff;
+    --muted:#cbd5e1;
+    --line:rgba(255,255,255,.14);
+    --shadow: 0 14px 40px rgba(0,0,0,.45);
+    --radius: 18px;
+
+    --green:#22c55e;
+    --red:#ef4444;
+  }
+
+  *{ box-sizing:border-box; }
+
+  body{
+    margin:0;
+    font-family: Arial, Helvetica, sans-serif;
+    background: radial-gradient(1200px 800px at 10% 10%, #1a2a6a 0%, var(--bg) 55%) fixed;
+    color: var(--ink);
+  }
+
+  .app{ max-width:1200px; margin:0 auto; padding:14px; }
+
+  /* LAYOUT: SIEMPRE 2 COLUMNAS (INCLUSO TABLET PEQUEÑA) */
+  .layout{
+    display:grid;
+    grid-template-columns: 380px 1fr;
+    gap:14px;
+    align-items:start;
+  }
+  @media (max-width:520px){
+    .layout{
+      grid-template-columns: 300px 1fr;
+    }
+  }
+
+  .card{
+    background: linear-gradient(180deg, rgba(255,255,255,.08), rgba(255,255,255,.03));
+    border:1px solid var(--line);
+    border-radius:var(--radius);
+    box-shadow:var(--shadow);
+    overflow:hidden;
+    min-height: 240px;
+  }
+
+  /* LEFT: INSTRUCTIONS */
+  .left{ padding:16px; }
+
+  .chip{
+    display:inline-block;
+    padding:6px 10px;
+    border-radius:999px;
+    background:rgba(255,255,255,.10);
+    border:1px solid rgba(255,255,255,.12);
+    color:var(--muted);
+    font-weight:900;
+    font-size:12px;
+    letter-spacing:.4px;
+    text-transform:uppercase;
+    margin-bottom:10px;
+  }
+
+  .title{
+    margin:0 0 10px;
+    font-size:18px;
+    font-weight:900;
+    text-transform:uppercase;
+    letter-spacing:.4px;
+  }
+
+  #instrText{
+    margin:0 0 14px;
+    font-size:18px;
+    line-height:1.35;
+    font-weight:900;
+    letter-spacing:.3px;
+    text-transform:uppercase;
+    white-space:pre-line;
+  }
+
+  .note{
+    margin:0 0 12px;
+    color:var(--muted);
+    font-size:13px;
+    line-height:1.35;
+    text-transform:uppercase;
+    letter-spacing:.2px;
+    min-height: 18px;
+  }
+
+  .btnRow{
+    display:flex;
+    gap:10px;
+    flex-wrap:wrap;
+    justify-content:flex-end;
+  }
+
+  button{
+    border:0;
+    border-radius:14px;
+    padding:12px 14px;
+    font-weight:900;
+    cursor:pointer;
+    background:rgba(255,255,255,.10);
+    color:var(--ink);
+    text-transform:uppercase;
+    letter-spacing:.3px;
+  }
+  button:hover{ background:rgba(255,255,255,.14); }
+
+  button.primary{
+    background: rgba(34,197,94,.88);
+    color:#061f12;
+  }
+  button.primary:hover{ background: rgba(34,197,94,.98); }
+
+  button.yes{
+    background: rgba(255,255,255,.92);
+    color:#0b1224;
+  }
+  button.yes:hover{ background: rgba(255,255,255,.98); }
+
+  /* RIGHT: STAGE */
+  .right{ padding:14px; }
+  .stage{
+    position:relative;
+    width:100%;
+  }
+
+  /* We use a sizer image to reserve height (aula_normal) */
+  #imgSizer{
+    width:100%;
+    height:auto;
+    display:block;
+    opacity:0;
+    pointer-events:none;
+    border-radius:14px;
+    border:1px solid rgba(255,255,255,.10);
+  }
+
+  .sceneImg{
+    position:absolute;
+    inset:0;
+    width:100%;
+    height:auto;
+    display:block;
+    border-radius:14px;
+    border:1px solid rgba(255,255,255,.10);
+    opacity:0;
+    pointer-events:none;
+    transition: opacity 900ms ease;
+  }
+
+  .sceneImg.show{
+    opacity:1;
+    pointer-events:auto;
+  }
+
+  /* HOTSPOTS */
+  .zona{
+    position:absolute;
+    border-radius:12px;
+    background: rgba(255,255,255,0.00);
+    pointer-events:none;
+  }
+
+  /* AULA: optional confirm flash */
+  .flashOk{
+    outline: 4px solid var(--green);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 6px rgba(34,197,94,.25);
+  }
+
+  /* INSTITUTO: clase marcada cuando toca */
+  .markClase{
+    outline: 4px solid var(--green);
+    outline-offset: 2px;
+    box-shadow: 0 0 0 6px rgba(34,197,94,.25);
+    animation: pulse 1.1s infinite;
+  }
+
+  @keyframes pulse{
+    0%{ transform: scale(1); }
+    50%{ transform: scale(1.01); }
+    100%{ transform: scale(1); }
+  }
+
+  /* BARRIO: instituto SIEMPRE visible con CONTORNO ROJO (SIN RELLENO) */
+  #bInstitutoRef{
+    border: 3px solid rgba(239,68,68,.95);
+    box-shadow: 0 0 0 6px rgba(239,68,68,.14);
+    background: transparent; /* clave: sin relleno */
+    pointer-events:none; /* solo clicable en paso que toca */
+  }
+
+  #bInstitutoRef.activeRef{
+    pointer-events:auto;
+    cursor:pointer;
+    animation: pulseRef 1.1s infinite;
+  }
+
+  @keyframes pulseRef{
+    0%{ transform: scale(1); }
+    50%{ transform: scale(1.03); }
+    100%{ transform: scale(1); }
+  }
+</style>
+</head>
+
+<body>
+<div class="app">
+  <div class="layout">
+
+    <!-- LEFT PANEL -->
+    <section class="card left" aria-label="Instrucciones">
+      <div class="chip" id="chip">INICIO</div>
+      <h1 class="title">INSTRUCCIONES</h1>
+
+      <p id="instrText"></p>
+      <p class="note" id="note">PULSA ▶ PLAY PARA ESCUCHAR.</p>
+
+      <div class="btnRow">
+        <button id="btnPlay">▶ PLAY</button>
+        <button class="yes" id="btnYes" style="display:none;">¡SÍ!</button>
+        <button class="primary" id="btnContinue" style="display:none;">CONTINUAR</button>
+      </div>
+    </section>
+
+    <!-- RIGHT PANEL -->
+    <section class="card right" aria-label="Mapa">
+      <div class="stage" id="stage">
+        <!-- Reserve height -->
+        <img id="imgSizer" src="aula_normal.jpg" alt="" />
+
+        <!-- Images (fade) -->
+        <img id="imgAulaNormal" class="sceneImg" src="aula_normal.jpg" alt="Aula vista normal" />
+        <img id="imgAulaMapa" class="sceneImg" src="aula_mapa.jpg" alt="Aula vista desde arriba" />
+        <img id="imgInstituto" class="sceneImg" src="mapa.jpg" alt="Instituto visto desde arriba" />
+        <img id="imgBarrio" class="sceneImg" src="barrio.jpg" alt="Barrio visto desde arriba" />
+
+        <!-- ======================
+             HOTSPOTS: AULA (sobre aula_mapa)
+             ====================== -->
+        <div class="zona" id="aZ1" data-target="a1" style="left:22.01%;top:31.05%;width:25.26%;height:22.07%"></div>
+        <div class="zona" id="aZ2" data-target="a2" style="left:52.28%;top:30.18%;width:24.35%;height:23.73%"></div>
+        <div class="zona" id="aZ3" data-target="a3" style="left:22.14%;top:58.79%;width:25.72%;height:26.86%"></div><!-- ✅ CORRECTA -->
+        <div class="zona" id="aZ4" data-target="a4" style="left:51.63%;top:60.45%;width:26.50%;height:25.00%"></div>
+
+        <!-- ======================
+             HOTSPOTS: INSTITUTO (sobre mapa.jpg)
+             (Mantenemos las coords que ya te funcionaban)
+             ====================== -->
+        <div class="zona" id="iPistas" data-target="i_pistas" style="left:6%;top:18%;width:42%;height:32%"></div>
+        <div class="zona" id="iEntrada" data-target="i_entrada" style="left:45%;top:66%;width:10%;height:22%"></div>
+        <div class="zona" id="iClase"  data-target="i_clase"  style="left:53.4%;top:69.6%;width:6.5%;height:11.7%"></div>
+
+        <!-- ======================
+             HOTSPOTS: BARRIO (sobre barrio.jpg)
+             Instituto: referencia SIEMPRE visible (contorno rojo)
+             Mar y Oficinas: invisibles cuando toca
+             ====================== -->
+        <div class="zona" id="bInstitutoRef" data-target="b_instituto"
+             style="left:37.1%;top:1.8%;width:6.2%;height:16.7%"></div>
+
+        <div class="zona" id="bOficinas" data-target="b_oficinas"
+             style="left:37.4%;top:74.4%;width:18.8%;height:21.8%"></div>
+
+        <div class="zona" id="bMar" data-target="b_mar"
+             style="left:78.9%;top:42.0%;width:21.1%;height:48.0%"></div>
+      </div>
+    </section>
+
+  </div>
+</div>
+
+<script>
+(() => {
+  // -----------------------
+  // TTS
+  // -----------------------
+  function speak(text){
+    try{
+      speechSynthesis.cancel();
+      const u = new SpeechSynthesisUtterance(text);
+      u.lang = "es-ES";
+      u.rate = 0.92;
+      u.pitch = 1.0;
+      speechSynthesis.speak(u);
+    }catch(e){}
+  }
+
+  // -----------------------
+  // DOM
+  // -----------------------
+  const chipEl = document.getElementById("chip");
+  const instrEl = document.getElementById("instrText");
+  const noteEl = document.getElementById("note");
+  const btnPlay = document.getElementById("btnPlay");
+  const btnYes = document.getElementById("btnYes");
+  const btnContinue = document.getElementById("btnContinue");
+
+  const imgAulaNormal = document.getElementById("imgAulaNormal");
+  const imgAulaMapa   = document.getElementById("imgAulaMapa");
+  const imgInstituto  = document.getElementById("imgInstituto");
+  const imgBarrio     = document.getElementById("imgBarrio");
+
+  // AULA zones
+  const aZones = [
+    document.getElementById("aZ1"),
+    document.getElementById("aZ2"),
+    document.getElementById("aZ3"),
+    document.getElementById("aZ4"),
+  ];
+
+  // INSTITUTO zones
+  const iPistas  = document.getElementById("iPistas");
+  const iEntrada = document.getElementById("iEntrada");
+  const iClase   = document.getElementById("iClase");
+
+  // BARRIO zones
+  const bInstitutoRef = document.getElementById("bInstitutoRef");
+  const bMar          = document.getElementById("bMar");
+  const bOficinas     = document.getElementById("bOficinas");
+
+  let currentText = "";
+
+  function setText(t){
+    currentText = (t || "").toUpperCase();
+    instrEl.textContent = currentText;
+  }
+
+  btnPlay.addEventListener("click", () => speak(currentText));
+
+  // -----------------------
+  // IMAGE VISIBILITY (fade)
+  // -----------------------
+  function hideAllImages(){
+    [imgAulaNormal, imgAulaMapa, imgInstituto, imgBarrio].forEach(img => {
+      img.classList.remove("show");
+      img.style.pointerEvents = "none";
+    });
+  }
+
+  function showImage(which){
+    hideAllImages();
+    which.classList.add("show");
+    which.style.pointerEvents = "auto";
+  }
+
+  // -----------------------
+  // HOTSPOTS enable/disable
+  // -----------------------
+  function disableAllHotspots(){
+    // AULA
+    aZones.forEach(z => { z.style.pointerEvents = "none"; z.classList.remove("flashOk"); });
+    // INSTITUTO
+    [iPistas, iEntrada, iClase].forEach(z => { z.style.pointerEvents = "none"; z.classList.remove("markClase"); });
+    // BARRIO
+    bInstitutoRef.style.pointerEvents = "none";
+    bInstitutoRef.classList.remove("activeRef");
+    bMar.style.pointerEvents = "none";
+    bOficinas.style.pointerEvents = "none";
+  }
+
+  function enableAulaTargets(){
+    disableAllHotspots();
+    aZones.forEach(z => z.style.pointerEvents = "auto");
+  }
+
+  function enableInstitutoTarget(target){
+    disableAllHotspots();
+    if(target === "clase"){
+      // marcada
+      iClase.style.pointerEvents = "auto";
+      iClase.classList.add("markClase");
+    } else if(target === "entrada"){
+      // invisible
+      iEntrada.style.pointerEvents = "auto";
+    } else if(target === "pistas"){
+      // invisible
+      iPistas.style.pointerEvents = "auto";
+    }
+  }
+
+  function enableBarrioTarget(target){
+    disableAllHotspots();
+    // Instituto referencia SIEMPRE visible (contorno rojo). Aquí solo activamos click si toca.
+    // (El div se ve siempre porque tiene borde; no lo ocultamos nunca.)
+    if(target === "instituto"){
+      bInstitutoRef.style.pointerEvents = "auto";
+      bInstitutoRef.classList.add("activeRef");
+    } else if(target === "mar"){
+      bMar.style.pointerEvents = "auto"; // invisible, clicable
+    } else if(target === "oficinas"){
+      bOficinas.style.pointerEvents = "auto"; // invisible, clicable
+    }
+  }
+
+  // -----------------------
+  // SCENES (action/praise/transition)
+  // Rules:
+  // - action: requires correct click, no Continue
+  // - praise: has Continue, no “transition narrative” inside
+  // - transition: has Continue, creative bridge text to next module
+  // -----------------------
+  const scenes = [
+    // ===== AULA =====
+    {
+      id:"a_intro",
+      chip:"AULA · INICIO",
+      kind:"intro_yes",
+      image:"aula_normal",
+      text:
+`¡MIRA! ESTA AULA SE PARECE A LA TUYA.
+HAY MESAS, SILLAS Y UNA PIZARRA.
+TAMBIÉN HAY UNA PUERTA PARA ENTRAR Y SALIR.
+Y VENTANAS POR DONDE ENTRA LA LUZ.
+
+TODO ESTÁ EN SU SITIO, COMO EN TU CLASE.
+
+PERO HAY UNA PREGUNTA…
+¿CÓMO SE VERÍA ESTA MISMA CLASE DESDE ARRIBA?
+
+COMO SI VOLARAS CERCA DEL TECHO.
+COMO SI FUERAS UN PÁJARO.
+O UNA CÁMARA EN EL AIRE.
+
+¿QUIERES VERLO?`
+    },
+    {
+      id:"a_action_seat",
+      chip:"AULA · PASO 1",
+      kind:"action",
+      image:"aula_mapa",
+      target:"a3",
+      text:
+`AHORA ESTAMOS MIRANDO LA CLASE DESDE ARRIBA.
+TODO ES IGUAL… PERO PLANO.
+
+BUSCA TU MESA.
+PIENSA DÓNDE TE SIENTAS TÚ CADA DÍA.
+
+HAZ CLICK DONDE TE SIENTAS EN LA CLASE.`
+    },
+    {
+      id:"a_praise",
+      chip:"BIEN",
+      kind:"praise",
+      image:"aula_mapa",
+      text:
+`¡MUY BIEN!
+HAS ENCONTRADO TU SITIO.
+AHÍ ES DONDE TE SIENTAS CADA DÍA.`
+    },
+    {
+      id:"a_to_i_transition",
+      chip:"TRANSICIÓN",
+      kind:"transition",
+      image:"aula_mapa",
+      text:
+`AHORA VAMOS A SUBIR MÁS ALTO.
+
+SI SUBIMOS MÁS…
+LA CLASE SE HACE PEQUEÑA.
+Y EMPEZAMOS A VER TODO EL EDIFICIO.
+
+VAMOS A VER TU INSTITUTO DESDE ARRIBA.
+
+COMO LO VERÍA UN PÁJARO VOLANDO.
+COMO LO VERÍA UN DRON DESDE EL CIELO.
+
+PREPÁRATE…
+VAMOS A MIRAR TODO EL INSTITUTO.`
+    },
+
+    // ===== INSTITUTO =====
+    {
+      id:"i_action_clase",
+      chip:"INSTITUTO · PASO 1",
+      kind:"action",
+      image:"instituto",
+      target:"i_clase",
+      text:
+`ESTE ES TU INSTITUTO VISTO DESDE ARRIBA.
+
+DENTRO ESTÁ TU CLASE.
+
+¿PUEDES ENCONTRARLA?
+HAZ CLICK EN TU CLASE.`
+    },
+    {
+      id:"i_praise_clase",
+      chip:"BIEN",
+      kind:"praise",
+      image:"instituto",
+      text:
+`¡CORRECTO!
+ESA ES TU CLASE DENTRO DEL INSTITUTO.`
+    },
+    {
+      id:"i_action_entrada",
+      chip:"INSTITUTO · PASO 2",
+      kind:"action",
+      image:"instituto",
+      target:"i_entrada",
+      text:
+`TODOS LOS DÍAS ENTRAS POR LA PUERTA PRINCIPAL.
+POR AHÍ LLEGAS AL INSTITUTO.
+
+BUSCA LA ENTRADA.
+HAZ CLICK DONDE ENTRAS CADA DÍA.`
+    },
+    {
+      id:"i_praise_entrada",
+      chip:"BIEN",
+      kind:"praise",
+      image:"instituto",
+      text:
+`¡MUY BIEN!
+POR AHÍ ENTRAS AL INSTITUTO.`
+    },
+    {
+      id:"i_action_pistas",
+      chip:"INSTITUTO · PASO 3",
+      kind:"action",
+      image:"instituto",
+      target:"i_pistas",
+      text:
+`FUERA DEL EDIFICIO HAY UN LUGAR GRANDE.
+ALLÍ HACÉIS DEPORTE.
+CORRÉIS, JUGÁIS Y OS MOVÉIS.
+
+BUSCA LAS PISTAS DEPORTIVAS.`
+    },
+    {
+      id:"i_praise_pistas",
+      chip:"BIEN",
+      kind:"praise",
+      image:"instituto",
+      text:
+`¡GENIAL!
+ESAS SON LAS PISTAS.`
+    },
+    {
+      id:"i_to_b_transition",
+      chip:"TRANSICIÓN",
+      kind:"transition",
+      image:"instituto",
+      text:
+`AHORA VAMOS A SUBIR TODAVÍA MÁS.
+
+EL INSTITUTO YA NO OCUPA TODA LA PANTALLA.
+AHORA PODEMOS VER LAS CALLES.
+LAS CASAS.
+Y COSAS QUE ESTÁN CERCA.
+
+VAMOS A VER EL BARRIO ENTERO DESDE ARRIBA.
+COMO SI ESTUVIÉRAMOS EN UNA NUBE.`
+    },
+
+    // ===== BARRIO =====
+    {
+      id:"b_action_inst",
+      chip:"BARRIO · PASO 1",
+      kind:"action",
+      image:"barrio",
+      target:"b_instituto",
+      text:
+`AHORA VEMOS EL BARRIO.
+
+EL INSTITUTO ESTÁ MARCADO.
+ES NUESTRO PUNTO DE REFERENCIA.
+
+PRIMERO ENCUÉNTRALO.
+HAZ CLICK EN EL INSTITUTO.`
+    },
+    {
+      id:"b_praise_inst",
+      chip:"BIEN",
+      kind:"praise",
+      image:"barrio",
+      text:
+`PERFECTO.
+YA SABEMOS DÓNDE ESTÁ EL INSTITUTO.`
+    },
+    {
+      id:"b_action_mar",
+      chip:"BARRIO · PASO 2",
+      kind:"action",
+      image:"barrio",
+      target:"b_mar",
+      text:
+`AHORA BUSCA EL MAR.
+
+ES UNA ZONA MUY GRANDE Y ABIERTA.
+NO HAY EDIFICIOS.
+NO HAY CALLES.
+
+¿DÓNDE ESTÁ EL MAR?`
+    },
+    {
+      id:"b_praise_mar",
+      chip:"BIEN",
+      kind:"praise",
+      image:"barrio",
+      text:
+`¡MUY BIEN!
+ESO ES EL MAR.`
+    },
+    {
+      id:"b_action_ofi",
+      chip:"BARRIO · PASO 3",
+      kind:"action",
+      image:"barrio",
+      target:"b_oficinas",
+      text:
+`CERCA DEL MAR HAY DOS EDIFICIOS MUY ALTOS.
+SON MÁS ALTOS QUE LOS DEMÁS.
+SE VEN DESDE LEJOS.
+
+DESDE TU CLASE LOS PUEDES VER.
+
+BUSCA ESOS EDIFICIOS.
+¿DÓNDE ESTÁN EN EL MAPA?`
+    },
+    {
+      id:"b_praise_final",
+      chip:"FINAL",
+      kind:"praise_end",
+      image:"barrio",
+      text:
+`¡FELICIDADES!
+HAS APRENDIDO A MIRAR LOS LUGARES DESDE ARRIBA.
+AHORA SABES USAR UN MAPA.`
+    }
+  ];
+
+  let idx = 0;
+
+  function render(){
+    const s = scenes[idx];
+
+    chipEl.textContent = s.chip.toUpperCase();
+    setText(s.text);
+
+    // Buttons visibility
+    btnYes.style.display = (s.kind === "intro_yes") ? "inline-block" : "none";
+    btnContinue.style.display = (s.kind === "praise" || s.kind === "transition" || s.kind === "praise_end") ? "inline-block" : "none";
+
+    // Note
+    if(s.kind === "action"){
+      noteEl.textContent = "PULSA ▶ PLAY PARA ESCUCHAR. LUEGO HAZ CLICK EN EL MAPA.";
+    } else if(s.kind === "intro_yes"){
+      noteEl.textContent = "PULSA ▶ PLAY PARA ESCUCHAR. LUEGO PULSA ¡SÍ!";
+    } else {
+      noteEl.textContent = "PULSA ▶ PLAY PARA ESCUCHAR. LUEGO PULSA CONTINUAR.";
+    }
+
+    // Image (fade)
+    if(s.image === "aula_normal") showImage(imgAulaNormal);
+    else if(s.image === "aula_mapa") showImage(imgAulaMapa);
+    else if(s.image === "instituto") showImage(imgInstituto);
+    else if(s.image === "barrio") showImage(imgBarrio);
+
+    // Hotspots
+    if(s.kind === "action"){
+      if(s.target === "a3"){
+        enableAulaTargets();
+      } else if(s.target === "i_clase"){
+        enableInstitutoTarget("clase");
+      } else if(s.target === "i_entrada"){
+        enableInstitutoTarget("entrada");
+      } else if(s.target === "i_pistas"){
+        enableInstitutoTarget("pistas");
+      } else if(s.target === "b_instituto"){
+        enableBarrioTarget("instituto");
+      } else if(s.target === "b_mar"){
+        enableBarrioTarget("mar");
+      } else if(s.target === "b_oficinas"){
+        enableBarrioTarget("oficinas");
+      } else {
+        disableAllHotspots();
+      }
+    } else {
+      // praise/transition: no clicks
+      disableAllHotspots();
+      // BUT barrio institute reference must remain visible always:
+      // it is always visible by CSS border; we just keep pointer-events off here.
+    }
+  }
+
+  // -----------------------
+  // Scene navigation
+  // -----------------------
+  function next(){
+    idx = Math.min(idx + 1, scenes.length - 1);
+    render();
+  }
+
+  function resetAll(){
+    idx = 0;
+    render();
+  }
+
+  // YES button (only from intro)
+  btnYes.addEventListener("click", () => {
+    // Move to aula map action
+    // Ensure we go to the next scene (a_action_seat)
+    next();
+  });
+
+  // CONTINUE button
+  btnContinue.addEventListener("click", () => {
+    const s = scenes[idx];
+    if(s.kind === "praise_end"){
+      resetAll();
+      return;
+    }
+    next();
+  });
+
+  // -----------------------
+  // Click handling
+  // -----------------------
+  function onCorrectTarget(target){
+    const s = scenes[idx];
+    if(s.kind !== "action") return;
+
+    // AULA: correct is a3
+    if(s.target === "a3"){
+      if(target === "a3"){
+        // tiny confirm
+        document.getElementById("aZ3").classList.add("flashOk");
+        next(); // praise
+      } else {
+        noteEl.textContent = "NO. PRUEBA OTRA VEZ.";
+        speak("NO. PRUEBA OTRA VEZ.");
+      }
+      return;
+    }
+
+    // INSTITUTO
+    if(s.target === "i_clase" && target === "i_clase") { next(); return; }
+    if(s.target === "i_entrada" && target === "i_entrada") { next(); return; }
+    if(s.target === "i_pistas" && target === "i_pistas") { next(); return; }
+
+    // BARRIO
+    if(s.target === "b_instituto" && target === "b_instituto") { next(); return; }
+    if(s.target === "b_mar" && target === "b_mar") { next(); return; }
+    if(s.target === "b_oficinas" && target === "b_oficinas") { next(); return; }
+  }
+
+  // AULA zones
+  document.getElementById("aZ1").addEventListener("click", () => onCorrectTarget("a1"));
+  document.getElementById("aZ2").addEventListener("click", () => onCorrectTarget("a2"));
+  document.getElementById("aZ3").addEventListener("click", () => onCorrectTarget("a3"));
+  document.getElementById("aZ4").addEventListener("click", () => onCorrectTarget("a4"));
+
+  // INSTITUTO zones
+  iClase.addEventListener("click", () => onCorrectTarget("i_clase"));
+  iEntrada.addEventListener("click", () => onCorrectTarget("i_entrada"));
+  iPistas.addEventListener("click", () => onCorrectTarget("i_pistas"));
+
+  // BARRIO zones
+  bInstitutoRef.addEventListener("click", () => onCorrectTarget("b_instituto"));
+  bMar.addEventListener("click", () => onCorrectTarget("b_mar"));
+  bOficinas.addEventListener("click", () => onCorrectTarget("b_oficinas"));
+
+  // -----------------------
+  // Start state
+  // -----------------------
+  // Start with Aula normal visible; reference border for barrio institute is always visible by CSS
+  showImage(imgAulaNormal);
+  render();
+})();
+</script>
+</body>
+</html>
